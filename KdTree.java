@@ -1,7 +1,7 @@
 /***
   * Author:        Paul Rodriguez
   * Created:       3/11/2014
-  * Last Updated:  3/13/2014
+  * Last Updated:  3/14/2014
   */
 import java.util.Comparator;
 import java.util.ArrayList;
@@ -15,12 +15,12 @@ public class KdTree
         private Node left;
         private Node right;
         
-        public Node(Point2D p, boolean vertical, Node Left, Node Right, RectHV rectangle)
+        private Node(Point2D p, boolean vertical, Node left, Node right, RectHV rectangle)
         {
             this.point = p;
             this.isVertical = vertical;
-            this.left = Left;
-            this.right = Right;
+            this.left = left;
+            this.right = right;
             this.rect = rectangle;
         }
         
@@ -113,7 +113,7 @@ public class KdTree
             if (comparator.compare(p, n.getPoint()) < 0)
             {
                 //  if the left point is null then create new node and set it
-                if(n.getLeft() == null)
+                if (n.getLeft() == null)
                 {
                     RectHV rect = null;
                     if (n.vertical())
@@ -163,42 +163,41 @@ public class KdTree
         }  
     }
     
+    
     public boolean contains(Point2D p)
     {
-        if (root == null)
-            return false;
-        
-        Node iterator = root;
-        
-        Comparator<Point2D> comparator = Point2D.Y_ORDER;
-        
-        while (iterator != null)
+        return containsRecursive(root, p);
+    }
+    
+     private boolean containsRecursive(Node node, Point2D point) {
+        if (node == null) 
         {
-            Point2D ipoint = iterator.getPoint();
-            if (ipoint.equals(p))
-                return true;
-            
-            if (iterator.vertical())
-            {
-                comparator = Point2D.X_ORDER;
-            }
-            else
-            {
-                comparator = Point2D.Y_ORDER;
-            }
-            
-            //  go left
-            if (comparator.compare(ipoint, p) < 0)
-            {
-                iterator = iterator.getLeft();
-            }
-            else
-            {
-                iterator = iterator.getRight();
-            }
+            return false;
         }
-        
-        return false;
+
+        Point2D nPoint = node.getPoint();
+        if (nPoint.equals(point)) 
+        {
+            return true;
+        }
+
+        Comparator<Point2D> comparator = null;
+        if (node.vertical()) {
+            comparator = Point2D.X_ORDER;
+        }
+        else
+        {
+            comparator = Point2D.Y_ORDER;
+        }
+
+        if (comparator.compare(point, nPoint) < 0) 
+        {
+            return containsRecursive(node.getLeft(), point);
+        } 
+        else 
+        {
+            return containsRecursive(node.getRight(), point);
+        }
     }
     
 public void draw() {
@@ -287,13 +286,129 @@ private void drawRecursive(Node node) {
              rangeRecursive(rangeList, rect, n.getRight());
      }
      
-     //  TODO
+     
+     private Comparator<Point2D> distanceOrder(final Point2D queryPoint) {
+        return new Comparator<Point2D>() {
+            public int compare(Point2D p1, Point2D p2) {
+                double dist1 = queryPoint.distanceSquaredTo(p1);
+                double dist2 = queryPoint.distanceSquaredTo(p2);
+                if (dist1 < dist2) return -1;
+                else if (dist1 > dist2) return +1;
+                else return 0;
+            }
+        };
+    }
+  
      public Point2D nearest(Point2D p)
      {
-         MinPQ<Point2D> minpt = new MinPQ<Point2D>();
-         nearestRecursive();
-         return minpt;
+         if (size == 0)
+             return null;
+         
+         MinPQ<Point2D> minpt = new MinPQ<Point2D>(distanceOrder(p));
+         nearestRecursive(minpt, root, p, new RectHV(0.0, 0.0, 1.0, 1.0));
+         return minpt.min();
      }
      
-     private v
+   
+     private void nearestRecursive(MinPQ<Point2D> m, Node n, Point2D p, RectHV rect)
+     {
+         if (n == null)
+             return;
+         
+         Point2D nPoint = n.getPoint();
+         m.insert(nPoint);
+         //  this is so that it doesnt make too much calls to  methods of Point2D and RectHV
+         double rectXmin = rect.xmin();
+         double rectXmax = rect.xmax();
+         double rectYmin = rect.ymin();
+         double rectYmax = rect.ymax();
+         double pointx = nPoint.x();
+         double pointy = nPoint.y();
+         
+         if (n.vertical())
+         {
+            RectHV leftRect = new RectHV(rectXmin, rectYmin,
+                    pointx, rectYmax);
+            RectHV rightRect = new RectHV(pointx, rectYmin,
+                    rectXmax, rectYmax);
+
+
+             if (p.x() < pointx)
+             {
+                 nearestRecursive(m, n.getLeft(), p, leftRect);
+                 double distanceToNearest = m.min().distanceSquaredTo(p);
+                 double distanceToRect = rightRect.distanceSquaredTo(p);
+                 if (distanceToRect < distanceToNearest) 
+                 {
+                     nearestRecursive(m, n.getRight(), p, rightRect);
+                 }
+                 /*Node nRight = n.getRight();
+                 if (nRight != null)
+                 {
+                     //  if distance to other rectangle is less than current min ditance point
+                     if (nRight.getRect().distanceSquaredTo(p) < m.min().distanceSquaredTo(p))
+                         nearestRecursive(m, n.getRight(), p);
+                 }*/
+             }
+             else
+             {
+                 nearestRecursive(m, n.getRight(), p, rightRect);
+                 double distanceToNearest = m.min().distanceSquaredTo(p);
+                 double distanceToRect = leftRect.distanceSquaredTo(p);
+                 if (distanceToRect < distanceToNearest) 
+                 {
+                     nearestRecursive(m, n.getLeft(), p, leftRect);
+                 }
+                 /*Node nLeft = n.getLeft();
+                 if(nLeft != null)
+                 {
+                     //  if distance to other rectangle is less than current min ditance point
+                     if (nLeft.getRect().distanceSquaredTo(p) < m.min().distanceSquaredTo(p))
+                         nearestRecursive(m, n.getLeft(), p);
+                 }*/
+             }
+         }
+         else
+         {
+             //  for horizontal lines
+             
+             RectHV bottomRect = new RectHV(rectXmin, rectYmin, rectXmax, pointy);
+             RectHV topRect = new RectHV(rectXmin, pointy, rectXmax, rectYmax);
+             //  if point lies below the horizonal line of current search point
+             if (p.y() < pointy)
+             {
+                 nearestRecursive(m, n.getLeft(), p, bottomRect);
+                 double distanceToNearest = m.min().distanceSquaredTo(p);
+                 double distanceToRect = topRect.distanceSquaredTo(p);
+                 if (distanceToRect < distanceToNearest)
+                 {
+                     nearestRecursive(m, n.getRight(), p, topRect);
+                 }
+                 /*
+                 Node nBottom = n.getLeft();
+                 if (nBottom != null)
+                 {
+                     if (nBottom.getRect().distanceSquaredTo(p) < m.min().distanceSquaredTo(p))
+                         nearestRecursive(m, n.getRight(), p);
+                 }*/
+             }
+             else
+             {
+                 nearestRecursive(m, n.getRight(), p, topRect);
+                 double distanceToNearest = m.min().distanceSquaredTo(p);
+                 double distanceToRect = bottomRect.distanceSquaredTo(p);
+                 if (distanceToRect < distanceToNearest)
+                 {
+                     nearestRecursive(m, n.getLeft(), p, bottomRect);
+                 }
+                 /*
+                 Node nTop = n.getRight();
+                 if (nTop != null)
+                 {
+                     if (nTop.getRect().distanceSquaredTo(p) < m.min().distanceSquaredTo(p))
+                         nearestRecursive(m, n.getLeft(), p);
+                 }*/
+             }
+         }
+     }
 }

@@ -1,10 +1,10 @@
 /****
   * Author:        Paul Rodriguez
   * Created:       3/11/2014
-  * Last Updated:  3/13/2014
+  * Last Updated:  3/14/2014
   */
 import java.util.ArrayList;
-import java.util.TreeSet;
+
 public class PointSET
 {
   private SET<Point2D> points;
